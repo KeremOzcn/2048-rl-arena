@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TwentyRL Arena — 2048 AI Agent with Logic, Math & MCTS</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #f5f7fb;
+            --surface: #ffffff;
+            --surface-alt: #eef1f7;
+            --text: #1a1d2e;
+            --text-muted: #6b7280;
+            --text-dim: #9ca3af;
+            --border: #e5e8ef;
+            --primary: #4f46e5;
+            --primary-soft: #eef0fe;
+            --accent: #f97316;
+            --accent-soft: #fef3eb;
+            --success: #10b981;
+            --success-soft: #ecfdf5;
+            --warning: #f59e0b;
+            --warning-soft: #fef3c7;
+            --danger: #ef4444;
+            --danger-soft: #fee2e2;
+            --grid-bg: #bbada0;
+            --cell-empty: #cdc1b4;
+        }
+
+        /* Dark theme */
+        [data-theme="dark"] {
+            --bg: #0f1117;
+            --surface: #1a1d2e;
+            --surface-alt: #252836;
+            --text: #e4e6ef;
+            --text-muted: #9ca3af;
+            --text-dim: #6b7280;
+            --border: #2d3148;
+            --primary: #818cf8;
+            --primary-soft: #1e1b4b;
+            --accent: #fb923c;
+            --accent-soft: #431407;
+            --success: #34d399;
+            --success-soft: #064e3b;
+            --warning: #fbbf24;
+            --warning-soft: #451a03;
+            --danger: #f87171;
+            --danger-soft: #450a0a;
+            --grid-bg: #3d3a33;
+            --cell-empty: #4a4640;
+        }
+
+        /* Ocean theme */
+        [data-theme="ocean"] {
+            --bg: #0c1222;
+            --surface: #131a2e;
+            --surface-alt: #1a2340;
+            --text: #c8d6e5;
+            --text-muted: #8395a7;
+            --text-dim: #576574;
+            --border: #243456;
+            --primary: #48dbfb;
+            --primary-soft: #0a2647;
+            --accent: #ff6b6b;
+            --accent-soft: #3d0f0f;
+            --success: #1dd1a1;
+            --success-soft: #0a3d2d;
+            --warning: #feca57;
+            --warning-soft: #3d3000;
+            --danger: #ee5a24;
+            --danger-soft: #3d1500;
+            --grid-bg: #1a2a4a;
+            --cell-empty: #243456;
+        }
+
+        /* Sunset theme */
+        [data-theme="sunset"] {
+            --bg: #fef5ef;
+            --surface: #ffffff;
+            --surface-alt: #fef0e6;
+            --text: #2d1810;
+            --text-muted: #8b6f5e;
+            --text-dim: #b8a090;
+            --border: #f0ddd0;
+            --primary: #e17055;
+            --primary-soft: #fde8e2;
+            --accent: #6c5ce7;
+            --accent-soft: #eae6fd;
+            --success: #00b894;
+            --success-soft: #e6f9f3;
+            --warning: #fdcb6e;
+            --warning-soft: #fef4de;
+            --danger: #d63031;
+            --danger-soft: #fde2e2;
+            --grid-bg: #c8a88a;
+            --cell-empty: #dcc4b0;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        /* HEADER */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding: 20px 24px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+
+        .logo-block { display: flex; align-items: center; gap: 14px; }
+
+        .logo {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary), #7c3aed);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 20px;
+        }
+
+        .title-block h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+        .title-block .subtitle { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+
+        .stats-row { display: flex; gap: 12px; }
+
+        .stat-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 16px;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* TABS */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 6px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px 18px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .tab.active { background: var(--primary); color: white; }
+        .tab:not(.active):hover { background: var(--surface-alt); color: var(--text); }
+
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        /* GAME PANEL */
+        .game-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 980px) { .game-grid { grid-template-columns: 1fr; } }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+        .card-title {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text);
+        }
+
+        .card-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-left: auto;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* GAME BOARD */
+        .board-wrapper { display: flex; flex-direction: column; align-items: center; }
+
+        .board {
+            background: var(--grid-bg);
+            border-radius: 8px;
+            padding: 8px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            width: 100%;
+            max-width: 380px;
+            aspect-ratio: 1;
+        }
+
+        .cell {
+            background: var(--cell-empty);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 32px;
+            color: #776e65;
+            transition: background-color 0.15s ease;
+        }
+
+        .cell.t-2 { background: #eee4da; color: #776e65; }
+        .cell.t-4 { background: #ede0c8; color: #776e65; }
+        .cell.t-8 { background: #f2b179; color: #f9f6f2; }
+        .cell.t-16 { background: #f59563; color: #f9f6f2; }
+        .cell.t-32 { background: #f67c5f; color: #f9f6f2; }
+        .cell.t-64 { background: #f65e3b; color: #f9f6f2; }
+        .cell.t-128 { background: #edcf72; color: #f9f6f2; font-size: 28px; }
+        .cell.t-256 { background: #edcc61; color: #f9f6f2; font-size: 28px; }
+        .cell.t-512 { background: #edc850; color: #f9f6f2; font-size: 28px; }
+        .cell.t-1024 { background: #edc53f; color: #f9f6f2; font-size: 24px; }
+        .cell.t-2048 { background: #edc22e; color: #f9f6f2; font-size: 24px; }
+        .cell.empty { color: transparent; }
+
+        /* BUTTONS */
+        .button-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 18px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            position: relative;
+            overflow: hidden;
+            transform: translateY(0);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .btn:hover {
+            background: var(--primary-soft);
+            color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+            border-color: var(--primary);
+        }
+
+        .btn:active {
+            transform: translateY(0) scale(0.96);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            transition: all 0.05s;
+        }
+
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .btn.btn-primary {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            box-shadow: 0 2px 8px rgba(79,70,229,0.3);
+        }
+        .btn.btn-primary:hover {
+            background: #4338ca;
+            box-shadow: 0 4px 16px rgba(79,70,229,0.4);
+            transform: translateY(-2px);
+        }
+        .btn.btn-primary:active { transform: translateY(0) scale(0.97); }
+
+        .btn.btn-accent {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+            box-shadow: 0 2px 8px rgba(249,115,22,0.3);
+        }
+        .btn.btn-accent:hover {
+            background: #ea580c;
+            box-shadow: 0 4px 16px rgba(249,115,22,0.4);
+            transform: translateY(-2px);
+        }
+        .btn.btn-accent:active { transform: translateY(0) scale(0.97); }
+
+        .btn.btn-danger {
+            background: var(--danger);
+            color: white;
+            border-color: var(--danger);
+            box-shadow: 0 2px 8px rgba(239,68,68,0.3);
+            animation: pulse-danger 2s infinite;
+        }
+        .btn.btn-danger:hover {
+            box-shadow: 0 4px 16px rgba(239,68,68,0.4);
+        }
+
+        @keyframes pulse-danger {
+            0%, 100% { box-shadow: 0 2px 8px rgba(239,68,68,0.3); }
+            50% { box-shadow: 0 2px 16px rgba(239,68,68,0.5); }
+        }
+
+        /* Cell animations */
+        .cell {
+            background: var(--cell-empty);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 32px;
+            color: #776e65;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .cell.pop {
+            animation: cellPop 0.2s ease;
+        }
+
+        @keyframes cellPop {
+            0% { transform: scale(0.92); }
+            60% { transform: scale(1.04); }
+            100% { transform: scale(1); }
+        }
+
+        /* Card hover */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+            border-color: #d0d5e0;
+        }
+
+        /* Pillar badge animations */
+        .pillar-badge {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+        .pillar-badge:hover { transform: scale(1.05); }
+        .pillar-badge.logic { background: var(--primary-soft); color: var(--primary); }
+        .pillar-badge.math { background: var(--accent-soft); color: var(--accent); }
+        .pillar-badge.mcts { background: var(--success-soft); color: var(--success); }
+
+        /* Q-VALUES */
+        .q-values { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        .q-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            background: var(--surface-alt);
+            border-radius: 8px;
+            font-size: 13px;
+            transition: all 0.15s;
+        }
+
+        .q-row.best {
+            background: var(--accent-soft);
+            border: 1px solid var(--accent);
+        }
+
+        .q-direction {
+            font-weight: 600;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .q-arrow { font-size: 16px; color: var(--text-muted); }
+        .q-row.best .q-arrow { color: var(--accent); }
+
+        .q-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+        .q-row.best .q-value { color: var(--accent); font-weight: 600; }
+
+        /* MONITORING METRICS */
+        .metrics-list { display: flex; flex-direction: column; gap: 12px; }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+        .metric-row:last-child { border-bottom: none; }
+
+        .metric-label { color: var(--text-muted); font-weight: 500; }
+        .metric-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        /* PROGRESS BAR */
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--surface-alt);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        .progress-fill.warning { background: var(--warning); }
+        .progress-fill.danger { background: var(--danger); }
+        .progress-fill.success { background: var(--success); }
+
+        /* CHART */
+        .chart-wrapper { position: relative; height: 220px; }
+        .chart-wrapper.tall { height: 320px; }
+
+        /* MONITORING DASHBOARD */
+        .monitor-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 980px) { .monitor-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        .kpi-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 3px;
+            background: var(--primary);
+        }
+        .kpi-card.kpi-pm::before { background: var(--primary); }
+        .kpi-card.kpi-tech::before { background: var(--accent); }
+        .kpi-card.kpi-success::before { background: var(--success); }
+        .kpi-card.kpi-warning::before { background: var(--warning); }
+
+        .kpi-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .kpi-value {
+            font-size: 32px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .kpi-trend { font-size: 12px; color: var(--text-muted); }
+        .kpi-trend.up { color: var(--success); }
+        .kpi-trend.down { color: var(--danger); }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        @media (max-width: 980px) { .dashboard-grid { grid-template-columns: 1fr; } }
+
+        /* TRAINING CONTROL */
+        .training-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: var(--primary-soft);
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .training-info { flex: 1; font-size: 13px; }
+        .training-info strong { color: var(--primary); }
+
+        /* AI PILLARS */
+        .pillar-section { margin-bottom: 20px; }
+        .pillar-section h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .pillar-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .pillar-badge.logic { background: var(--primary-soft); color: var(--primary); }
+        .pillar-badge.math { background: var(--accent-soft); color: var(--accent); }
+        .pillar-badge.mcts { background: var(--success-soft); color: var(--success); }
+        .prop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .prop-item { display: flex; justify-content: space-between; padding: 8px 12px; background: var(--surface-alt); border-radius: 6px; font-size: 12px; }
+        .prop-item .val { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+        .prop-item .val.true { color: var(--success); }
+        .prop-item .val.false { color: var(--danger); }
+        .rule-item { padding: 10px 14px; background: var(--surface-alt); border-radius: 8px; margin-bottom: 8px; font-size: 12px; border-left: 3px solid var(--primary); }
+        .rule-item.fired { border-left-color: var(--success); background: var(--success-soft); }
+        .rule-item .rule-name { font-weight: 700; }
+        .rule-item .rule-conclusion { color: var(--primary); font-weight: 600; }
+        .tt-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+        .tt-table th, .tt-table td { padding: 6px 10px; border: 1px solid var(--border); text-align: center; }
+        .tt-table th { background: var(--surface-alt); font-weight: 600; }
+        .tt-table td.true { color: var(--success); font-weight: 600; }
+        .tt-table td.false { color: var(--danger); }
+        .math-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .math-metric { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+        .math-metric:last-child { border-bottom: none; }
+        .math-metric .label { color: var(--text-muted); }
+        .math-metric .value { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+        .mcts-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--surface-alt); border-radius: 8px; margin-bottom: 8px; font-size: 13px; }
+        .mcts-bar .dir { font-weight: 700; width: 50px; }
+        .mcts-bar .bar-wrap { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+        .mcts-bar .bar-fill { height: 100%; background: var(--success); border-radius: 4px; transition: width 0.3s; }
+        .mcts-bar .stat { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); min-width: 100px; text-align: right; }
+        .mcts-bar.best .bar-fill { background: var(--accent); }
+        .mcts-bar.best { background: var(--accent-soft); }
+
+        /* FOOTER */
+        footer {
+            margin-top: 32px;
+            padding: 16px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-block">
+                <div class="logo">RL</div>
+                <div class="title-block">
+                    <h1>TwentyRL Arena</h1>
+                    <div class="subtitle">2048 · Q-Learning · Logic · Math · MCTS</div>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="stat-label">Score</div>
+                        <div class="stat-value" id="hdr-score">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Moves</div>
+                        <div class="stat-value" id="hdr-moves">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Max</div>
+                        <div class="stat-value" id="hdr-max">2</div>
+                    </div>
+                </div>
+                <button class="btn" onclick="cycleTheme()" id="theme-btn" title="Change theme" style="font-size:18px;padding:8px 12px;min-width:auto">🎨</button>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab(0)">🎮 Play & RL Agent</button>
+            <button class="tab" onclick="switchTab(1)">📊 Management Monitoring</button>
+            <button class="tab" onclick="switchTab(2)">⚙️ Technical Monitoring</button>
+        </div>
+
+        <!-- PANEL 0: GAME -->
+        <div class="panel active" id="panel-0">
+            <div class="game-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-dot" style="background: var(--accent)"></span>
+                        <span class="card-title">Game Board</span>
+                        <span class="card-subtitle" id="game-status">Ready</span>
+                    </div>
+                    <div class="board-wrapper">
+                        <div class="board" id="board"></div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-top:14px;justify-content:center;flex-wrap:wrap">
+                            <label style="font-size:12px;font-weight:600;color:var(--text-muted)">AI Algorithm:</label>
+                            <select id="algo-select" class="btn" style="cursor:pointer;font-size:12px;padding:8px 12px">
+                                <option value="q_learning">Q-Learning (RL)</option>
+                                <option value="mcts">MCTS</option>
+                                <option value="hill_climbing">Hill Climbing</option>
+                                <option value="simulated_annealing">Simulated Annealing</option>
+                                <option value="genetic_algorithm">Genetic Algorithm</option>
+                            </select>
+                        </div>
+                        <div class="button-row">
+                            <button class="btn btn-accent" onclick="aiMoveAlgo()">🤖 AI Move</button>
+                            <button class="btn btn-primary" onclick="toggleAuto()" id="auto-btn">▶ Auto Play</button>
+                            <button class="btn" onclick="newGame()">🔄 New Game</button>
+                            <button class="btn" onclick="compareAlgorithms()" id="compare-btn" title="Compare all 5 algorithms on current state">📊 Compare All</button>
+                        </div>
+                        <div style="text-align:center;margin-top:10px;font-size:11px;color:var(--text-muted)">
+                            Arrow keys = manual | Algorithm: <strong id="current-algo-label">Q-Learning</strong> | Latency: <strong id="algo-latency">— ms</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="card" style="margin-bottom:16px">
+                        <div class="card-header">
+                            <span class="card-dot" style="background:var(--accent)"></span>
+                            <span class="card-title">Algorithm Decision</span>
+                            <span class="card-subtitle" id="last-direction">—</span>
+                        </div>
+                        <div class="q-values" id="q-values">
+                            <div class="q-row"><span class="q-direction"><span class="q-arrow">↑</span> Up</span><span class="q-value">—</span></div>
+                            <div class="q-row"><span class="q-direction"><span class="q-arrow">↓</span> Down</span><span class="q-value">—</span></div>
+                            <div class="q-row"><span class="q-direction"><span class="q-arrow">←</span> Left</span><span class="q-value">—</span></div>
+                            <div class="q-row"><span class="q-direction"><span class="q-arrow">→</span> Right</span><span class="q-value">—</span></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-dot" style="background:var(--primary)"></span>
+                            <span class="card-title">Live Metrics</span>
+                        </div>
+                        <div class="metrics-list">
+                            <div class="metric-row"><span class="metric-label">Inference Latency</span><span class="metric-value" id="m-latency">— ms</span></div>
+                            <div class="metric-row"><span class="metric-label">Q-Table States</span><span class="metric-value" id="m-qsize">—</span></div>
+                            <div class="metric-row"><span class="metric-label">Epsilon (ε)</span><span class="metric-value" id="m-epsilon">—</span></div>
+                            <div class="metric-row"><span class="metric-label">Empty Cells</span><span class="metric-value" id="m-empty">—</span></div>
+                            <div class="metric-row"><span class="metric-label">Tile Count</span><span class="metric-value" id="m-tiles">—</span></div>
+                            <div class="metric-row"><span class="metric-label">Mean Tile Value</span><span class="metric-value" id="m-mean">—</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REAL-TIME ANALYSIS (below game, same panel) -->
+            <div style="margin-top:20px">
+                <!-- ALGORITHM EXPLANATIONS (collapsible) -->
+                <details style="margin-bottom:16px" class="card" id="algo-explanations">
+                    <summary style="cursor:pointer;padding:14px 18px;font-weight:700;font-size:13px;color:var(--text);user-select:none;list-style:none;display:flex;align-items:center;gap:8px">
+                        <span style="font-size:16px">📖</span> Algorithm Guide — What each algorithm does
+                        <span style="margin-left:auto;font-size:10px;color:var(--text-muted);font-weight:400">click to expand</span>
+                    </summary>
+                    <div style="padding:0 18px 18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+                        <div style="padding:12px;background:var(--surface-alt);border-radius:8px;border-left:3px solid #4f46e5">
+                            <div style="font-weight:700;font-size:12px;margin-bottom:6px">🧠 Q-Learning (Reinforcement Learning)</div>
+                            <div style="font-size:11px;color:var(--text-muted);line-height:1.5">
+                                <b>Ne yapar:</b> Deneme-yanılma ile her durum-eylem çifti için bir Q-değeri öğrenir. Eğitim sonrası en yüksek Q-değerine sahip eylemi seçer.<br>
+                                <b>Güçlü:</b> Eğitildikten sonra çok hızlı çıkarım (O(1) tablo araması). Uzun vadeli strateji öğrenir.<br>
+                                <b>Zayıf:</b> Uzun eğitim süresi gerektirir. Görülmemiş durumlar için Q=0 döner (soğuk başlangıç).<br>
+                                <b>Ne zaman:</b> Çok sayıda oyun oynayarak eğitildiyse en iyi seçim. Hızlı karar gerektiren durumlarda ideal.
+                            </div>
+                        </div>
+                        <div style="padding:12px;background:var(--surface-alt);border-radius:8px;border-left:3px solid #10b981">
+                            <div style="font-weight:700;font-size:12px;margin-bottom:6px">🌳 MCTS (Monte Carlo Tree Search)</div>
+                            <div style="font-size:11px;color:var(--text-muted);line-height:1.5">
+                                <b>Ne yapar:</b> İleriye dönük simülasyonlar yaparak en iyi hamleyi bulur. Her hamle için bir arama ağacı oluşturur.<br>
+                                <b>Güçlü:</b> Eğitim gerektirmez. Derin ileri görüşlülük. Belirsizliği iyi yönetir (UCB1 ile keşif/sömürü dengesi).<br>
+                                <b>Zayıf:</b> Her hamle için hesaplama yoğun. İterasyon sayısına bağlı kalite.<br>
+                                <b>Ne zaman:</b> Eğitilmiş model yoksa veya karmaşık durumları analiz etmek gerektiğinde.
+                            </div>
+                        </div>
+                        <div style="padding:12px;background:var(--surface-alt);border-radius:8px;border-left:3px solid #f59e0b">
+                            <div style="font-weight:700;font-size:12px;margin-bottom:6px">⛰️ Hill Climbing</div>
+                            <div style="font-size:11px;color:var(--text-muted);line-height:1.5">
+                                <b>Ne yapar:</b> Her adımda en iyi komşu durumu seçer. Açgözlü (greedy) yerel arama.<br>
+                                <b>Güçlü:</b> Basit ve hızlı. Düzgün (smooth) maliyet yüzeylerinde etkili.<br>
+                                <b>Zayıf:</b> Yerel optimumlara takılır. Keşif yapamaz, sadece sömürü.<br>
+                                <b>Ne zaman:</b> Hızlı ve basit bir karar gerektiğinde. Board durumu nispeten iyi olduğunda.
+                            </div>
+                        </div>
+                        <div style="padding:12px;background:var(--surface-alt);border-radius:8px;border-left:3px solid #ef4444">
+                            <div style="font-weight:700;font-size:12px;margin-bottom:6px">🌡️ Simulated Annealing</div>
+                            <div style="font-size:11px;color:var(--text-muted);line-height:1.5">
+                                <b>Ne yapar:</b> Sıcaklık parametresiyle başta rastgele, zamanla açgözlü hale gelir. Kötü hamleleri başta kabul eder.<br>
+                                <b>Güçlü:</b> Yerel optimumlardan kaçabilir. Keşif→sömürü geçişi otomatik.<br>
+                                <b>Zayıf:</b> Sıcaklık soğuduktan sonra Hill Climbing'e dönüşür. Parametre ayarı (cooling rate) hassas.<br>
+                                <b>Ne zaman:</b> Sıcaklık yüksekken (oyun başı). Yerel optimumlardan çıkmak gerektiğinde.
+                            </div>
+                        </div>
+                        <div style="padding:12px;background:var(--surface-alt);border-radius:8px;border-left:3px solid #8b5cf6">
+                            <div style="font-weight:700;font-size:12px;margin-bottom:6px">🧬 Genetic Algorithm</div>
+                            <div style="font-size:11px;color:var(--text-muted);line-height:1.5">
+                                <b>Ne yapar:</b> Hamle dizilerinden oluşan bir popülasyon evrimleştirir. Seçilim, çaprazlama ve mutasyon uygular.<br>
+                                <b>Güçlü:</b> Global arama yapabilir. Gradyan gerektirmez. Popülasyon çeşitliliği sayesinde güçlü keşif.<br>
+                                <b>Zayıf:</b> Hesaplama yoğun (popülasyon × nesil). Tek hamle için aşırı olabilir.<br>
+                                <b>Ne zaman:</b> Karmaşık durumlar için global arama gerektiğinde. Diğer algoritmalar tutarsız sonuç verdiğinde.
+                            </div>
+                        </div>
+                    </div>
+                </details>
+                <div class="dashboard-grid">
+                    <!-- LOGIC ENGINE (realtime) -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-dot" style="background:var(--primary)"></span>
+                            <span class="card-title">Logic Engine</span>
+                            <span class="pillar-badge logic">Modus Ponens</span>
+                            <span class="card-subtitle" id="rt-logic-strategy">—</span>
+                        </div>
+                        <div class="prop-grid" id="rt-props" style="font-size:11px"></div>
+                        <div style="margin-top:10px">
+                            <div style="font-size:11px;font-weight:700;margin-bottom:6px">🔥 Fired Rules</div>
+                            <div id="rt-rules" style="font-size:11px"><span style="color:var(--text-muted)">Play a move to see inference</span></div>
+                        </div>
+                        <div style="margin-top:10px">
+                            <div style="font-size:11px;font-weight:700;margin-bottom:6px">Logic Bias</div>
+                            <div class="prop-grid" id="rt-logic-bias" style="font-size:11px"></div>
+                        </div>
+                    </div>
+
+                    <!-- LINEAR ALGEBRA (realtime) -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-dot" style="background:var(--accent)"></span>
+                            <span class="card-title">Linear Algebra</span>
+                            <span class="pillar-badge math">Norms & Eigen</span>
+                        </div>
+                        <div class="metrics-list" id="rt-la" style="font-size:11px"></div>
+                        <div style="margin-top:8px;padding:8px 10px;background:var(--surface-alt);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted)">
+                            ‖A‖<sub>F</sub> = √(Σ|a<sub>ij</sub>|²) &nbsp;|&nbsp; Av = λv &nbsp;|&nbsp; rank(A) ≤ 4
+                        </div>
+                    </div>
+
+                    <!-- PROBABILITY (realtime) -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-dot" style="background:var(--accent)"></span>
+                            <span class="card-title">Probability</span>
+                            <span class="pillar-badge math">H(X) & E[X]</span>
+                        </div>
+                        <div class="metrics-list" id="rt-prob" style="font-size:11px"></div>
+                        <div style="margin-top:8px;padding:8px 10px;background:var(--surface-alt);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted)">
+                            H(X) = -Σ P(x)log₂P(x) &nbsp;|&nbsp; E[X] = Σ x·P(x)
+                        </div>
+                    </div>
+
+                    <!-- Q-VALUES + RADAR CHART (realtime) -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-dot" style="background:var(--success)"></span>
+                            <span class="card-title">Combined Decision Radar</span>
+                            <span class="pillar-badge mcts">Q + Logic + MCTS</span>
+                        </div>
+                        <div style="position:relative;height:200px;margin-bottom:8px">
+                            <canvas id="chart-radar"></canvas>
+                        </div>
+                        <div class="metrics-list" id="rt-qvals" style="font-size:11px"></div>
+                        <div style="margin-top:8px;padding:8px 10px;background:var(--surface-alt);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted)">
+                            Q(s,a) ← Q(s,a) + α[r + γ·max Q(s',a') − Q(s,a)]
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ALGORITHM COMPARISON TABLE -->
+                <div class="card" id="compare-section" style="margin-top:16px">
+                    <div class="card-header">
+                        <span class="card-dot" style="background:var(--warning)"></span>
+                        <span class="card-title">Algorithm Comparison</span>
+                        <span class="card-subtitle" id="compare-agreement">—</span>
+                    </div>
+                    <div style="overflow-x:auto">
+                        <table class="tt-table" id="compare-table">
+                            <tr>
+                                <th>Algorithm</th>
+                                <th>Action</th>
+                                <th>Time</th>
+                                <th>Confidence</th>
+                                <th>Spread</th>
+                                <th>Consensus</th>
+                                <th>Complexity</th>
+                            </tr>
+                            <tr><td colspan="7" style="color:var(--text-muted)">Click "📊 Compare All" to run comparison</td></tr>
+                        </table>
+                    </div>
+                    <div class="chart-wrapper" style="height:180px;margin-top:12px">
+                        <canvas id="chart-compare"></canvas>
+                    </div>
+                    <div id="compare-meta"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANEL 1: MANAGEMENT (Score Progression only, simplified) -->
+        <div class="panel" id="panel-1">
+            <div class="monitor-grid">
+                <div class="kpi-card kpi-pm">
+                    <div class="kpi-label">Total Episodes</div>
+                    <div class="kpi-value" id="pm-episodes">—</div>
+                    <div class="kpi-trend">Training history</div>
+                </div>
+                <div class="kpi-card kpi-pm">
+                    <div class="kpi-label">Best Score</div>
+                    <div class="kpi-value" id="pm-best">—</div>
+                    <div class="kpi-trend up">Peak performance</div>
+                </div>
+                <div class="kpi-card kpi-success">
+                    <div class="kpi-label">Best Max Tile</div>
+                    <div class="kpi-value" id="pm-besttile">—</div>
+                    <div class="kpi-trend up">Highest achieved</div>
+                </div>
+                <div class="kpi-card kpi-warning">
+                    <div class="kpi-label">Avg Score (Last 50)</div>
+                    <div class="kpi-value" id="pm-avg">—</div>
+                    <div class="kpi-trend">Recent trend</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-dot" style="background: var(--accent)"></span>
+                    <span class="card-title">Score Progression (RL Training Progress)</span>
+                    <span class="card-subtitle" id="scores-info">—</span>
+                </div>
+                <div class="chart-wrapper tall">
+                    <canvas id="chart-scores"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANEL 2: TECHNICAL -->
+        <div class="panel" id="panel-2">
+            <div class="monitor-grid">
+                <div class="kpi-card kpi-tech">
+                    <div class="kpi-label">Q-Table Size</div>
+                    <div class="kpi-value" id="tech-qsize">—</div>
+                    <div class="kpi-trend">States learned</div>
+                </div>
+                <div class="kpi-card kpi-tech">
+                    <div class="kpi-label">Inference Latency</div>
+                    <div class="kpi-value" id="tech-latency">— ms</div>
+                    <div class="kpi-trend up">Target: &lt;50ms</div>
+                </div>
+                <div class="kpi-card kpi-success">
+                    <div class="kpi-label">Test Pass Rate</div>
+                    <div class="kpi-value" id="tech-tests">—%</div>
+                    <div class="kpi-trend up">26/26 passing</div>
+                </div>
+                <div class="kpi-card kpi-tech">
+                    <div class="kpi-label">System Uptime</div>
+                    <div class="kpi-value" id="tech-uptime">—%</div>
+                    <div class="kpi-trend up">SLA: 99%</div>
+                </div>
+            </div>
+
+            <div class="training-control">
+                <div class="training-info">
+                    <strong>Train New Agent</strong><br>
+                    <span id="training-status">Idle</span>
+                </div>
+                <select id="train-episodes" class="btn" style="cursor: pointer;">
+                    <option value="50">50 episodes</option>
+                    <option value="100" selected>100 episodes</option>
+                    <option value="200">200 episodes</option>
+                    <option value="500">500 episodes</option>
+                </select>
+                <button class="btn btn-primary" onclick="startTraining()" id="train-btn">▶ Start Training</button>
+            </div>
+            <div class="progress-bar" style="margin-bottom: 20px;">
+                <div class="progress-fill" id="train-progress" style="width: 0%"></div>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-dot" style="background: var(--accent)"></span>
+                        <span class="card-title">Q-Table Growth</span>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-qsize"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-dot" style="background: var(--warning)"></span>
+                        <span class="card-title">Epsilon Decay (Exploration → Exploitation)</span>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-epsilon"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-dot" style="background: var(--success)"></span>
+                        <span class="card-title">Max Tile Achieved per Episode</span>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-maxtiles"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-dot" style="background: var(--primary)"></span>
+                        <span class="card-title">System Resources</span>
+                    </div>
+                    <div class="metrics-list">
+                        <div class="metric-row">
+                            <span class="metric-label">CPU Utilization</span>
+                            <span><span class="metric-value" id="tech-cpu">—%</span>
+                                <div class="progress-bar" style="width: 80px; display: inline-block; vertical-align: middle; margin-left: 8px;">
+                                    <div class="progress-fill" id="cpu-bar" style="width: 0%"></div>
+                                </div>
+                            </span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Memory Usage</span>
+                            <span class="metric-value" id="tech-memory">— MB</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Code Coverage</span>
+                            <span><span class="metric-value" id="tech-coverage">—%</span>
+                                <div class="progress-bar" style="width: 80px; display: inline-block; vertical-align: middle; margin-left: 8px;">
+                                    <div class="progress-fill success" id="cov-bar" style="width: 0%"></div>
+                                </div>
+                            </span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Current Epsilon</span>
+                            <span class="metric-value" id="tech-eps">—</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <footer>
+            TwentyRL Arena · Software Project Management & Technical Monitoring
+        </footer>
+    </div>
+
+    <script>
+        // ===== STATE =====
+        let isAutoPlay = false;
+        let autoTimer = null;
+        let charts = {};
+        let isMoving = false;  // Prevent overlapping requests
+
+        // ===== TAB SWITCHING =====
+        function switchTab(idx) {
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+            document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === idx));
+            if (idx === 1) loadManagementDashboard();
+            if (idx === 2) loadTechnicalDashboard();
+        }
+
+        // ===== BOARD RENDERING =====
+        let prevBoard = null;
+
+        function renderBoard(board) {
+            const el = document.getElementById('board');
+            el.innerHTML = '';
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    const v = board[i][j];
+                    const cell = document.createElement('div');
+                    cell.className = v === 0 ? 'cell empty' : 'cell t-' + v;
+                    cell.textContent = v === 0 ? '' : String(v);
+                    if (prevBoard && prevBoard[i] && prevBoard[i][j] !== v && v > 0) {
+                        cell.classList.add('pop');
+                    }
+                    el.appendChild(cell);
+                }
+            }
+            prevBoard = board.map(function(row) { return row.slice(); });
+        }
+
+        function updateHeaderStats(data) {
+            document.getElementById('hdr-score').textContent = data.score;
+            document.getElementById('hdr-moves').textContent = data.move_count;
+            document.getElementById('hdr-max').textContent = data.max_tile;
+            const status = data.game_over ? 'GAME OVER' : (data.won ? 'WON!' : 'In play');
+            document.getElementById('game-status').textContent = status;
+        }
+
+        function updateLiveMetrics(stats, agent, latency) {
+            if (latency !== undefined && latency !== null) {
+                document.getElementById('m-latency').textContent = latency + ' ms';
+            }
+            if (agent) {
+                document.getElementById('m-qsize').textContent = agent.q_table_size.toLocaleString();
+                document.getElementById('m-epsilon').textContent = agent.epsilon.toFixed(4);
+            }
+            if (stats) {
+                document.getElementById('m-empty').textContent = stats.empty_count;
+                document.getElementById('m-tiles').textContent = stats.tile_count;
+                document.getElementById('m-mean').textContent = stats.mean.toFixed(1);
+            }
+        }
+
+        function updateQValues(qValues, bestDir) {
+            const dirs = [
+                {key: 'up', arrow: '↑', label: 'Up'},
+                {key: 'down', arrow: '↓', label: 'Down'},
+                {key: 'left', arrow: '←', label: 'Left'},
+                {key: 'right', arrow: '→', label: 'Right'},
+            ];
+            const container = document.getElementById('q-values');
+            container.innerHTML = '';
+            for (const d of dirs) {
+                const v = qValues[d.key];
+                const isBest = d.key === bestDir;
+                const row = document.createElement('div');
+                row.className = 'q-row' + (isBest ? ' best' : '');
+                row.innerHTML = '<span class="q-direction"><span class="q-arrow">' + d.arrow +
+                    '</span>' + d.label + '</span><span class="q-value">' +
+                    (v !== undefined ? v.toFixed(3) : '—') + '</span>';
+                container.appendChild(row);
+            }
+        }
+
+        // ===== API CALLS =====
+        async function newGame() {
+            sa_reset(); // Reset SA temperature on new game
+            const r = await fetch('/api/new_game', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+            const d = await r.json();
+            renderBoard(d.board);
+            updateHeaderStats(d);
+            await analyze();
+        }
+
+        async function sa_reset() {
+            try { await fetch('/api/reset_sa', {method:'POST'}); } catch(e) {}
+        }
+
+        async function manualMove(direction) {
+            if (isMoving) return;
+            isMoving = true;
+            try {
+                const r = await fetch('/api/move', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({direction: direction})
+                });
+                const d = await r.json();
+                if (d && d.board) {
+                    renderBoard(d.board);
+                    updateHeaderStats(d);
+                    await analyze();
+                    // Also refresh realtime after manual move
+                    fetchAndUpdateRealtime();
+                }
+            } catch (err) {
+                console.error('Move failed:', err);
+            } finally {
+                isMoving = false;
+            }
+        }
+
+        // Old aiMove kept for compatibility
+        async function aiMove() { return await aiMoveAlgo(); }
+
+        async function aiMoveAlgo() {
+            if (isMoving) return false;
+            isMoving = true;
+            try {
+                const algo = document.getElementById('algo-select').value;
+                const algoNames = {q_learning:'Q-Learning',mcts:'MCTS',hill_climbing:'Hill Climbing',simulated_annealing:'Simulated Annealing',genetic_algorithm:'Genetic Algorithm'};
+                document.getElementById('current-algo-label').textContent = algoNames[algo] || algo;
+
+                const r = await fetch('/api/ai_move_algo', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({algorithm: algo})
+                });
+                const d = await r.json();
+                if (!d || !d.board) return false;
+                renderBoard(d.board);
+                updateHeaderStats(d);
+
+                // Update algo decision display
+                const info = d.algo_info || {};
+                const scores = info.action_scores || {};
+                const bestDir = info.best_action || '';
+                updateQValues(scores, bestDir);
+                document.getElementById('last-direction').textContent = (bestDir || '—').toUpperCase();
+                document.getElementById('m-latency').textContent = d.elapsed_ms + ' ms';
+                document.getElementById('algo-latency').textContent = d.elapsed_ms + ' ms';
+
+                // Update realtime sections
+                if (d.realtime) updateRealtime(d.realtime);
+
+                await analyzeStatsOnly();
+                return !d.game_over;
+            } catch (err) {
+                console.error('AI move failed:', err);
+                return false;
+            } finally {
+                isMoving = false;
+            }
+        }
+
+        function updateRealtime(rt) {
+            // Logic
+            if (rt.logic) {
+                document.getElementById('rt-logic-strategy').textContent = rt.logic.strategy;
+                const pg = document.getElementById('rt-props');
+                pg.innerHTML = '';
+                if (rt.logic.propositions) {
+                    for (const [k,v] of Object.entries(rt.logic.propositions)) {
+                        pg.innerHTML += '<div class="prop-item"><span>'+k+'</span><span class="val '+(v?'true':'false')+'">'+(v?'✓ TRUE':'✗ FALSE')+'</span></div>';
+                    }
+                }
+                const rr = document.getElementById('rt-rules');
+                if (rt.logic.rules_fired > 0) {
+                    let rulesHtml = '<span style="color:var(--success);font-weight:700">'+rt.logic.rules_fired+' rules fired</span>';
+                    if (rt.logic.fired_rules && rt.logic.fired_rules.length > 0) {
+                        rt.logic.fired_rules.forEach(function(rule) {
+                            var name = (typeof rule === 'object') ? (rule.rule_name || rule.conclusion || JSON.stringify(rule)) : String(rule);
+                            var conclusion = (typeof rule === 'object' && rule.conclusion) ? ' → ' + rule.conclusion : '';
+                            rulesHtml += '<div style="margin-top:4px;padding:6px 10px;background:var(--success-soft);border-radius:6px;font-size:11px;display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600">'+name+'</span><span style="color:var(--success);font-size:10px;font-family:JetBrains Mono,monospace">'+conclusion+'</span></div>';
+                        });
+                    }
+                    rr.innerHTML = rulesHtml;
+                } else {
+                    rr.innerHTML = '<span style="color:var(--text-muted)">No rules fired</span>';
+                }
+                const lb = document.getElementById('rt-logic-bias');
+                lb.innerHTML = '';
+                if (rt.logic.bias) {
+                    for (const [k,v] of Object.entries(rt.logic.bias)) {
+                        const color = v > 0 ? 'var(--success)' : (v < 0 ? 'var(--danger)' : 'var(--text-muted)');
+                        lb.innerHTML += '<div class="prop-item"><span>'+k+'</span><span class="val" style="color:'+color+'">'+(v>=0?'+':'')+v+'</span></div>';
+                    }
+                }
+            }
+            // Linear Algebra
+            if (rt.math) {
+                const la = document.getElementById('rt-la');
+                la.innerHTML = '';
+                for (const [k,v] of Object.entries(rt.math)) {
+                    const label = k.replace(/_/g,' ').replace(/\b\w/g, function(l){return l.toUpperCase();});
+                    la.innerHTML += '<div class="metric-row"><span class="metric-label">'+label+'</span><span class="metric-value" style="color:var(--accent)">'+v+'</span></div>';
+                }
+            }
+            // Probability
+            if (rt.probability) {
+                const pm = document.getElementById('rt-prob');
+                pm.innerHTML = '';
+                for (const [k,v] of Object.entries(rt.probability)) {
+                    if (k === 'tile_distribution') {
+                        for (const [tile,p] of Object.entries(v)) {
+                            const pct = (p*100).toFixed(1);
+                            pm.innerHTML += '<div class="metric-row"><span class="metric-label">P(tile='+tile+')</span><span class="metric-value">'+pct+'%</span></div>';
+                        }
+                    } else {
+                        const label = k.replace(/_/g,' ').replace(/\b\w/g, function(l){return l.toUpperCase();});
+                        const color = k === 'survival_prob' ? (v > 0.7 ? 'var(--success)' : (v > 0.3 ? 'var(--warning)' : 'var(--danger)')) : 'var(--primary)';
+                        pm.innerHTML += '<div class="metric-row"><span class="metric-label">'+label+'</span><span class="metric-value" style="color:'+color+'">'+v+'</span></div>';
+                    }
+                }
+            }
+            // Q-Values + Radar Chart
+            if (rt.q_values) {
+                const qv = document.getElementById('rt-qvals');
+                qv.innerHTML = '';
+                const combined = rt.combined || rt.q_values;
+                for (const [k,v] of Object.entries(combined)) {
+                    const qRaw = rt.q_values[k] || 0;
+                    const label = 'Combined(' + k + ')';
+                    qv.innerHTML += '<div class="metric-row"><span class="metric-label">'+label+'</span><span class="metric-value" style="color:var(--primary)">'+v+'</span></div>';
+                }
+
+                // Radar chart — handle negative & all-zero gracefully
+                const radarData = combined;
+                const dirs = ['up', 'right', 'down', 'left'];
+                const rawValues = dirs.map(function(d) { return radarData[d] || 0; });
+                const minVal = Math.min.apply(null, rawValues);
+                // Shift values so the minimum is at least 0, then add small base so chart is always visible
+                const offset = minVal < 0 ? Math.abs(minVal) : 0;
+                const values = rawValues.map(function(v) { return v + offset + 0.05; });
+                const maxVal = Math.max.apply(null, values.concat([1]));
+
+                const ctx = document.getElementById('chart-radar');
+                if (ctx) {
+                    try {
+                        if (charts['chart-radar']) { charts['chart-radar'].destroy(); charts['chart-radar'] = null; }
+                        charts['chart-radar'] = new Chart(ctx, {
+                            type: 'radar',
+                            data: {
+                                labels: ['↑ Up', '→ Right', '↓ Down', '← Left'],
+                                datasets: [{
+                                    label: 'Combined Score',
+                                    data: values,
+                                    backgroundColor: 'rgba(79,70,229,0.15)',
+                                    borderColor: 'rgba(79,70,229,0.8)',
+                                    borderWidth: 2,
+                                    pointBackgroundColor: 'rgba(79,70,229,1)',
+                                    pointRadius: 5,
+                                    pointHoverRadius: 7,
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                animation: { duration: 300 },
+                                plugins: { legend: { display: false } },
+                                scales: {
+                                    r: {
+                                        beginAtZero: true,
+                                        max: maxVal * 1.2,
+                                        ticks: { display: false },
+                                        grid: { color: '#e5e8ef' },
+                                        angleLines: { color: '#e5e8ef' },
+                                        pointLabels: { font: { size: 12, weight: '600' }, color: '#1a1d2e' }
+                                    }
+                                }
+                            }
+                        });
+                    } catch(e) { console.warn('Radar chart error:', e); }
+                }
+            }
+        }
+
+        async function fetchAndUpdateRealtime() {
+            try {
+                const r = await fetch('/api/realtime_analysis', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+                const d = await r.json();
+                updateRealtime(d);
+            } catch(e) { console.error('Realtime update error:', e); }
+        }
+
+        async function compareAlgorithms() {
+            const btn = document.getElementById('compare-btn');
+            btn.disabled = true; btn.textContent = '⏳ Comparing...';
+            try {
+                const r = await fetch('/api/compare_algorithms', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+                const d = await r.json();
+                document.getElementById('compare-agreement').textContent = d.agreement_rate + '% agreement → ' + d.consensus_action.toUpperCase();
+                const table = document.getElementById('compare-table');
+                const algoLabels = {q_learning:'Q-Learning',mcts:'MCTS',hill_climbing:'Hill Climbing',simulated_annealing:'Sim. Annealing',genetic_algorithm:'Genetic Algo.'};
+                const algoEmojis = {q_learning:'🧠',mcts:'🌳',hill_climbing:'⛰️',simulated_annealing:'🌡️',genetic_algorithm:'🧬'};
+
+                // Build enriched table
+                let html = '<tr><th>Algorithm</th><th>Action</th><th>Time</th><th>Confidence</th><th>Spread</th><th>Consensus</th><th>Complexity</th></tr>';
+                const chartLabels = [];
+                const chartTimes = [];
+                const chartConfidence = [];
+                const chartSpread = [];
+                for (const [algo, info] of Object.entries(d.results)) {
+                    const isCons = info.agrees_consensus;
+                    const emoji = algoEmojis[algo] || '';
+                    const consIcon = isCons ? '✅' : '❌';
+                    const meta = (d.algo_meta && d.algo_meta[algo]) || {};
+                    html += '<tr style="'+(isCons?'background:var(--success-soft)':'')+'"><td style="font-weight:700">'+emoji+' '+algoLabels[algo]+'</td><td style="font-weight:700;color:var(--primary)">'+info.action.toUpperCase()+'</td><td>'+info.time_ms+' ms</td>';
+                    html += '<td>'+info.confidence+'%</td><td>'+info.score_spread+'</td><td>'+consIcon+'</td><td>'+(meta.complexity||'—')+'</td></tr>';
+                    chartLabels.push(algoLabels[algo]);
+                    chartTimes.push(info.time_ms);
+                    chartConfidence.push(info.confidence);
+                    chartSpread.push(info.score_spread);
+                }
+                table.innerHTML = html;
+
+                // Multi-metric bar chart (latency + confidence + spread)
+                const ctx = document.getElementById('chart-compare');
+                if (charts['chart-compare']) charts['chart-compare'].destroy();
+
+                // Normalize all series to 0-100 for comparison
+                const maxTime = Math.max.apply(null, chartTimes.concat([1]));
+                const maxSpread = Math.max.apply(null, chartSpread.concat([0.01]));
+                const normTimes = chartTimes.map(function(v) { return Math.round(v / maxTime * 100); });
+                const normSpread = chartSpread.map(function(v) { return Math.round(v / maxSpread * 100); });
+
+                charts['chart-compare'] = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [
+                            {label: 'Latency (normalized)', data: normTimes, backgroundColor: 'rgba(239,68,68,0.7)'},
+                            {label: 'Confidence %', data: chartConfidence, backgroundColor: 'rgba(79,70,229,0.7)'},
+                            {label: 'Score Spread (norm.)', data: normSpread, backgroundColor: 'rgba(16,185,129,0.7)'},
+                        ]
+                    },
+                    options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{boxWidth:12,font:{size:10}}}},scales:{y:{beginAtZero:true,max:110,title:{display:true,text:'Normalized (0-100)'}}}}
+                });
+
+                // Show exploration/exploitation meta below chart
+                let metaHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:12px;font-size:11px">';
+                for (const [algo, meta] of Object.entries(d.algo_meta || {})) {
+                    metaHtml += '<div style="padding:8px 10px;background:var(--surface-alt);border-radius:6px">'
+                        + '<div style="font-weight:700;margin-bottom:4px">'+(algoEmojis[algo]||'')+' '+(algoLabels[algo]||algo)+'</div>'
+                        + '<div style="color:var(--text-muted)">Exploration: '+meta.exploration+'</div>'
+                        + '</div>';
+                }
+                metaHtml += '</div>';
+                document.getElementById('compare-meta').innerHTML = metaHtml;
+            } catch(e) { console.error('Compare error:', e); }
+            btn.disabled = false; btn.textContent = '📊 Compare All';
+        }
+
+        async function analyze() {
+            const r = await fetch('/api/analyze', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+            const d = await r.json();
+            updateQValues(d.q_values, null);
+            updateLiveMetrics(d.stats, d.agent);
+        }
+
+        async function analyzeStatsOnly() {
+            const r = await fetch('/api/analyze', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+            const d = await r.json();
+            updateLiveMetrics(d.stats, d.agent);
+        }
+
+        // ===== AUTO PLAY =====
+        function toggleAuto() {
+            const btn = document.getElementById('auto-btn');
+            if (isAutoPlay) {
+                isAutoPlay = false;
+                if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+                btn.textContent = '▶ Auto Play';
+                btn.classList.remove('btn-danger');
+                btn.classList.add('btn-primary');
+            } else {
+                isAutoPlay = true;
+                btn.textContent = '⏹ Stop';
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-danger');
+                autoStep();
+            }
+        }
+
+        async function autoStep() {
+            if (!isAutoPlay) return;
+            // Wait for previous move to finish
+            while (isMoving) {
+                await new Promise(r => setTimeout(r, 50));
+                if (!isAutoPlay) return;
+            }
+            try {
+                const cont = await aiMoveAlgo();
+                if (!cont) {
+                    // Game over — stop auto play
+                    if (isAutoPlay) toggleAuto();
+                    return;
+                }
+            } catch(e) {
+                console.error('Auto play error:', e);
+            }
+            // Schedule next step only if still playing
+            if (isAutoPlay) {
+                autoTimer = setTimeout(autoStep, 350);
+            }
+        }
+
+        // ===== MANAGEMENT DASHBOARD =====
+        async function loadManagementDashboard() {
+            // Training history (from train.py)
+            const hist = await fetch('/api/training_history').then(function(x) { return x.json(); });
+            const trainingScores = hist.episode_scores || [];
+            const trainingMaxTiles = hist.episode_max_tiles || [];
+
+            // Session history (from live gameplay)
+            const session = await fetch('/api/session_history').then(function(x) { return x.json(); });
+            const liveScores = session.move_scores || [];
+            const gameScores = session.game_scores || [];
+            const highScore = session.high_score || 0;
+
+            // Combine: training scores + live game scores for the chart
+            const allScores = trainingScores.concat(gameScores);
+
+            // KPIs - training + live combined
+            const bestTraining = trainingScores.length ? Math.max.apply(null, trainingScores) : 0;
+            const bestLive = highScore;
+            const bestOverall = Math.max(bestTraining, bestLive);
+            const bestTile = Math.max(
+                trainingMaxTiles.length ? Math.max.apply(null, trainingMaxTiles) : 0,
+                session.game_max_tiles && session.game_max_tiles.length ? Math.max.apply(null, session.game_max_tiles) : 0
+            );
+
+            document.getElementById('pm-episodes').textContent = trainingScores.length + (gameScores.length ? ' + ' + gameScores.length + ' games' : '');
+            document.getElementById('pm-best').textContent = bestOverall.toLocaleString();
+            document.getElementById('pm-besttile').textContent = bestTile;
+
+            // Avg from last 50 of all scores
+            var recentAll = allScores.slice(-50);
+            var avgAll = recentAll.length ? (recentAll.reduce(function(a,b){return a+b;}, 0) / recentAll.length) : 0;
+            document.getElementById('pm-avg').textContent = avgAll.toFixed(0);
+
+            document.getElementById('scores-info').textContent = trainingScores.length + ' trained + ' + gameScores.length + ' played';
+
+            // Score Progression: training episodes + live game completions
+            renderLineChart('chart-scores', allScores, 'Score per Episode/Game',
+                'rgba(249, 115, 22, 1)', 'rgba(249, 115, 22, 0.1)');
+        }
+
+        // ===== TECHNICAL DASHBOARD =====
+        async function loadTechnicalDashboard() {
+            const r = await fetch('/api/project_status');
+            const d = await r.json();
+
+            document.getElementById('tech-qsize').textContent = d.tech.q_table_size.toLocaleString();
+            document.getElementById('tech-latency').textContent = d.tech.inference_latency_ms + ' ms';
+            document.getElementById('tech-tests').textContent = d.tech.test_pass_rate.toFixed(0) + '%';
+            document.getElementById('tech-uptime').textContent = d.tech.system_uptime + '%';
+            document.getElementById('tech-cpu').textContent = d.tech.cpu_utilization + '%';
+            document.getElementById('cpu-bar').style.width = d.tech.cpu_utilization + '%';
+            document.getElementById('tech-memory').textContent = d.tech.memory_mb + ' MB';
+            document.getElementById('tech-coverage').textContent = d.tech.code_coverage + '%';
+            document.getElementById('cov-bar').style.width = d.tech.code_coverage + '%';
+            document.getElementById('tech-eps').textContent = d.tech.current_epsilon.toFixed(4);
+
+            const hist = await fetch('/api/training_history').then(x => x.json());
+            renderLineChart('chart-qsize', hist.q_table_size || [], 'Q-Table Size',
+                'rgba(79, 70, 229, 1)', 'rgba(79, 70, 229, 0.1)');
+            renderLineChart('chart-epsilon', hist.epsilon_history || [], 'Epsilon (ε)',
+                'rgba(245, 158, 11, 1)', 'rgba(245, 158, 11, 0.1)');
+            renderLineChart('chart-maxtiles', hist.episode_max_tiles || [], 'Max Tile',
+                'rgba(16, 185, 129, 1)', 'rgba(16, 185, 129, 0.1)');
+        }
+
+        function renderLineChart(canvasId, data, label, borderColor, bgColor) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            if (charts[canvasId]) charts[canvasId].destroy();
+            const labels = data.map(function(_, i) { return i + 1; });
+            charts[canvasId] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: borderColor,
+                        backgroundColor: bgColor,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {legend: {display: false}},
+                    scales: {
+                        x: {grid: {display: false}, ticks: {maxTicksLimit: 6}},
+                        y: {grid: {color: '#e5e8ef'}}
+                    }
+                }
+            });
+        }
+
+        // ===== TRAINING =====
+        async function startTraining() {
+            const ep = parseInt(document.getElementById('train-episodes').value);
+            const btn = document.getElementById('train-btn');
+            btn.disabled = true;
+            await fetch('/api/start_training', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({episodes: ep})
+            });
+
+            const poll = setInterval(async () => {
+                const r = await fetch('/api/training_state');
+                const s = await r.json();
+                document.getElementById('training-status').textContent =
+                    s.message + (s.is_running ? (' (' + s.progress + '/' + s.total + ')') : '');
+                const pct = s.total ? (s.progress / s.total * 100) : 0;
+                document.getElementById('train-progress').style.width = pct + '%';
+                if (!s.is_running) {
+                    clearInterval(poll);
+                    btn.disabled = false;
+                    loadTechnicalDashboard();
+                }
+            }, 800);
+        }
+
+        // ===== KEYBOARD =====
+        document.addEventListener('keydown', function(e) {
+            const map = {
+                ArrowUp: 'up',
+                ArrowDown: 'down',
+                ArrowLeft: 'left',
+                ArrowRight: 'right'
+            };
+            if (map[e.key] && !isAutoPlay) {
+                e.preventDefault();
+                manualMove(map[e.key]);
+            }
+        });
+
+
+
+        // ===== THEME SWITCHER =====
+        const themes = ['light', 'dark', 'ocean', 'sunset'];
+        const themeLabels = {'light': '☀️', 'dark': '🌙', 'ocean': '🌊', 'sunset': '🌅'};
+        let currentThemeIdx = 0;
+
+        function cycleTheme() {
+            currentThemeIdx = (currentThemeIdx + 1) % themes.length;
+            const theme = themes[currentThemeIdx];
+            if (theme === 'light') {
+                document.documentElement.removeAttribute('data-theme');
+            } else {
+                document.documentElement.setAttribute('data-theme', theme);
+            }
+            document.getElementById('theme-btn').textContent = themeLabels[theme];
+            localStorage.setItem('twentyrl-theme', theme);
+        }
+
+        // Load saved theme
+        (function() {
+            var saved = localStorage.getItem('twentyrl-theme');
+            if (saved && themes.indexOf(saved) > -1) {
+                currentThemeIdx = themes.indexOf(saved);
+                if (saved !== 'light') document.documentElement.setAttribute('data-theme', saved);
+                var btn = document.getElementById('theme-btn');
+                if (btn) btn.textContent = themeLabels[saved];
+            }
+        })();
+
+        // ===== INIT =====
+        newGame();
+    </script>
+</body>
+</html>

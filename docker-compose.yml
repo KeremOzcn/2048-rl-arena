@@ -1,0 +1,34 @@
+# =====================================================
+# TwentyRL Arena - Docker Compose
+# =====================================================
+# Usage:
+#   docker compose up --build      # build & start
+#   docker compose up -d           # start in background
+#   docker compose logs -f         # follow logs
+#   docker compose down            # stop & remove
+# =====================================================
+
+services:
+  twentyrl:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: twentyrl-arena
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - PYTHONUNBUFFERED=1
+    # Bind-mount the entire app directory so changes to model/history persist
+    # to the host machine. Comment this out to use only the files baked into
+    # the image at build time.
+    volumes:
+      - ./agent_final.pkl:/app/agent_final.pkl:rw
+      - ./training_history.json:/app/training_history.json:rw
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
