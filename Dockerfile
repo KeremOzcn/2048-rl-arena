@@ -30,8 +30,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 # Copy application code
-COPY app.py game_2048.py rl_agent.py train.py test_suite.py ./
-COPY templates/ ./templates/
+COPY app.py game_2048.py rl_agent.py logic_engine.py math_models.py mcts.py optimization.py train.py test_suite.py index.html ./
 
 # Copy pre-trained model & training history if they exist (optional)
 COPY agent_final.pkl* ./

@@ -28,6 +28,9 @@ import json
 import time
 import traceback
 import threading
+from collections import Counter
+
+import numpy as np
 from flask import Flask, render_template, jsonify, request, send_from_directory
 
 from game_2048 import Game2048
@@ -290,7 +293,6 @@ def api_analyze():
     actions = ['up', 'down', 'left', 'right']
 
     # Board statistics
-    import numpy as np
     flat = state.flatten()
     non_zero = flat[flat > 0]
 
@@ -699,7 +701,6 @@ def api_ai_move_algo():
                     break
 
     # Get real-time analysis for the NEW state (after move)
-    import numpy as np
     la = LinearAlgebraModels
     pm = ProbabilityModels
     s = game.get_state()
@@ -822,13 +823,10 @@ def api_compare_algorithms():
 
     # Agreement check
     chosen_actions = [r['action'] for r in results.values()]
-    from collections import Counter
     action_votes = dict(Counter(chosen_actions))
     consensus = max(action_votes, key=action_votes.get)
 
     # === Multi-dimensional comparison metrics ===
-    import numpy as _np
-
     for algo_key, info in results.items():
         sc = info.get('scores', {})
         vals = [sc.get(d, 0) for d in actions]
