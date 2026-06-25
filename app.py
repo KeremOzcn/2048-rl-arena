@@ -155,6 +155,23 @@ def handle_exception(e):
 
 
 # ---------------------------------------------------------------
+# HELPERS
+# ---------------------------------------------------------------
+
+def _update_session_history():
+    """Update session history after any AI move. Caps move_scores at 500."""
+    session_history['move_scores'].append(int(game.score))
+    if len(session_history['move_scores']) > 500:
+        session_history['move_scores'] = session_history['move_scores'][-500:]
+    if game.score > session_history['high_score']:
+        session_history['high_score'] = int(game.score)
+    if game.game_over:
+        session_history['game_scores'].append(int(game.score))
+        session_history['game_max_tiles'].append(game.get_max_tile())
+        session_history['game_moves'].append(int(game.move_count))
+
+
+# ---------------------------------------------------------------
 # ROUTES
 # ---------------------------------------------------------------
 
@@ -168,6 +185,7 @@ def api_new_game():
     """Start a new game"""
     global game
     game = Game2048()
+    sa_engine.reset()  # Reset SA temperature for each fresh game
     return jsonify({**game.to_dict(), 'message': 'New game started'})
 
 
@@ -227,6 +245,8 @@ def api_ai_move():
                 direction = actions[alt]
                 break
 
+    _update_session_history()
+
     return jsonify({
         **game.to_dict(),
         'changed': bool(changed),
@@ -274,6 +294,8 @@ def api_ai_move_full():
                 action = alt
                 decision_info['final_action'] = actions_list[alt]
                 break
+
+    _update_session_history()
 
     return jsonify({
         **game.to_dict(),
@@ -569,6 +591,7 @@ def api_start_training():
             for ep in range(episodes):
                 state = game_local.reset()
                 steps = 0
+                total_reward = 0.0
                 while not game_local.game_over and steps < 5000:
                     old_max = game_local.get_max_tile()
                     action = new_agent.choose_action(state)
@@ -578,10 +601,11 @@ def api_start_training():
                     reward = compute_reward(game_local, sg, changed, old_max, new_max)
                     new_agent.learn(state, action, reward, ns, done)
                     state = ns
+                    total_reward += reward
                     steps += 1
 
                 new_agent.decay_epsilon()
-                new_agent.training_history['episode_rewards'].append(0)
+                new_agent.training_history['episode_rewards'].append(total_reward)
                 new_agent.training_history['episode_scores'].append(game_local.score)
                 new_agent.training_history['episode_max_tiles'].append(game_local.get_max_tile())
                 new_agent.training_history['episode_moves'].append(steps)
@@ -736,14 +760,7 @@ def api_ai_move_algo():
         },
     }
 
-    # Track session history
-    session_history['move_scores'].append(int(game.score))
-    if game.score > session_history['high_score']:
-        session_history['high_score'] = int(game.score)
-    if game.game_over:
-        session_history['game_scores'].append(int(game.score))
-        session_history['game_max_tiles'].append(game.get_max_tile())
-        session_history['game_moves'].append(int(game.move_count))
+    _update_session_history()
 
     return jsonify({
         **game.to_dict(),

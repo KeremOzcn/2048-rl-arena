@@ -8,12 +8,14 @@ Principles of AI — Applied Group Project
 """
 
 import unittest
+import json
 import numpy as np
 from game_2048 import Game2048
 from rl_agent import QLearningAgent, compute_reward
 from logic_engine import LogicEngine, Proposition, AND, OR, NOT, IMPLIES, generate_truth_table, modus_ponens, resolution, Rule
 from math_models import LinearAlgebraModels, ProbabilityModels
 from mcts import MCTS, GameSimulator, MCTSNode
+from optimization import HillClimbing, SimulatedAnnealing, GeneticAlgorithm
 
 
 class TestGame2048(unittest.TestCase):
@@ -355,6 +357,204 @@ class TestIntegration(unittest.TestCase):
         self.assertIn('math', info)
 
 
+class TestOptimization(unittest.TestCase):
+    def setUp(self):
+        self.board = np.array([
+            [256, 128, 64, 32],
+            [16,    8,  4,  2],
+            [2,     4,  0,  0],
+            [0,     0,  0,  0]
+        ])
+
+    # --- Hill Climbing ---
+    def test_hc_returns_valid_action(self):
+        hc = HillClimbing(simulations_per_action=3, depth=2)
+        action, stats = hc.search(self.board)
+        self.assertIn(action, [0, 1, 2, 3])
+
+    def test_hc_stats_structure(self):
+        hc = HillClimbing(simulations_per_action=3, depth=2)
+        _, stats = hc.search(self.board)
+        self.assertIn('action_scores', stats)
+        self.assertIn('best_action', stats)
+        self.assertEqual(len(stats['action_scores']), 4)
+
+    def test_hc_best_action_matches_scores(self):
+        hc = HillClimbing(simulations_per_action=3, depth=2)
+        action, stats = hc.search(self.board)
+        dirs = ['up', 'down', 'left', 'right']
+        self.assertEqual(stats['best_action'], dirs[action])
+
+    # --- Simulated Annealing ---
+    def test_sa_returns_valid_action(self):
+        sa = SimulatedAnnealing(initial_temp=50.0, cooling_rate=0.9, simulations=3)
+        action, stats = sa.search(self.board)
+        self.assertIn(action, [0, 1, 2, 3])
+
+    def test_sa_temperature_decreases(self):
+        sa = SimulatedAnnealing(initial_temp=50.0, cooling_rate=0.9, simulations=3)
+        temp_before = sa.temperature
+        sa.search(self.board)
+        self.assertLess(sa.temperature, temp_before)
+
+    def test_sa_reset_restores_temperature(self):
+        sa = SimulatedAnnealing(initial_temp=50.0, cooling_rate=0.9, simulations=3)
+        sa.search(self.board)
+        sa.reset()
+        self.assertAlmostEqual(sa.temperature, 50.0)
+        self.assertEqual(sa.move_count, 0)
+
+    def test_sa_stats_has_temperature(self):
+        sa = SimulatedAnnealing(initial_temp=50.0, cooling_rate=0.9, simulations=3)
+        _, stats = sa.search(self.board)
+        self.assertIn('temperature', stats)
+        self.assertIn('action_scores', stats)
+
+    # --- Genetic Algorithm ---
+    def test_ga_returns_valid_action(self):
+        ga = GeneticAlgorithm(population_size=5, chromosome_length=4, generations=2)
+        action, stats = ga.search(self.board)
+        self.assertIn(action, [0, 1, 2, 3])
+
+    def test_ga_stats_structure(self):
+        ga = GeneticAlgorithm(population_size=5, chromosome_length=4, generations=2)
+        _, stats = ga.search(self.board)
+        self.assertIn('action_scores', stats)
+        self.assertIn('best_fitness', stats)
+        self.assertIn('generation_stats', stats)
+        self.assertEqual(len(stats['generation_stats']), 2)
+
+    def test_ga_action_scores_all_directions(self):
+        ga = GeneticAlgorithm(population_size=5, chromosome_length=4, generations=2)
+        _, stats = ga.search(self.board)
+        for d in ['up', 'down', 'left', 'right']:
+            self.assertIn(d, stats['action_scores'])
+
+    def test_ga_best_action_is_valid_direction(self):
+        ga = GeneticAlgorithm(population_size=5, chromosome_length=4, generations=2)
+        action, stats = ga.search(self.board)
+        self.assertIn(stats['best_action'], ['up', 'down', 'left', 'right'])
+
+
+class TestFlaskEndpoints(unittest.TestCase):
+    def setUp(self):
+        import app as flask_app
+        flask_app.app.config['TESTING'] = True
+        self.client = flask_app.app.test_client()
+        # Start each test with a fresh game
+        self.client.post('/api/new_game')
+
+    def test_new_game(self):
+        r = self.client.post('/api/new_game')
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertIn('board', data)
+        self.assertIn('score', data)
+        self.assertEqual(data['score'], 0)
+        self.assertEqual(len(data['board']), 4)
+
+    def test_move_valid_direction(self):
+        r = self.client.post('/api/move',
+                             data=json.dumps({'direction': 'left'}),
+                             content_type='application/json')
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertIn('changed', data)
+        self.assertIn('board', data)
+
+    def test_move_invalid_direction(self):
+        r = self.client.post('/api/move',
+                             data=json.dumps({'direction': 'diagonal'}),
+                             content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_ai_move(self):
+        r = self.client.post('/api/ai_move')
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertIn('q_values', data)
+        self.assertIn('direction', data)
+
+    def test_ai_move_full(self):
+        r = self.client.post('/api/ai_move_full')
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertIn('decision_info', data)
+        self.assertIn('final_action', data['decision_info'])
+
+    def test_analyze(self):
+        r = self.client.post('/api/analyze')
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertIn('q_values', data)
+        self.assertIn('stats', data)
+
+    def test_logic_analysis(self):
+        r = self.client.post('/api/logic_analysis')
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertIn('strategy', data)
+        self.assertIn('fired_rules', data)
+        self.assertIn('truth_table', data)
+
+    def test_math_analysis(self):
+        r = self.client.post('/api/math_analysis')
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertIn('linear_algebra', data)
+        self.assertIn('probability', data)
+
+    def test_training_history_empty(self):
+        import app as flask_app
+        # Temporarily hide history file
+        import os
+        path = flask_app.HISTORY_PATH
+        backup = path + '.bak'
+        existed = os.path.exists(path)
+        if existed:
+            os.rename(path, backup)
+        try:
+            r = self.client.get('/api/training_history')
+            self.assertEqual(r.status_code, 200)
+            data = json.loads(r.data)
+            self.assertIn('episode_scores', data)
+        finally:
+            if existed:
+                os.rename(backup, path)
+
+    def test_session_history(self):
+        r = self.client.get('/api/session_history')
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertIn('move_scores', data)
+        self.assertIn('high_score', data)
+
+    def test_ai_move_algo_qlearning(self):
+        r = self.client.post('/api/ai_move_algo',
+                             data=json.dumps({'algorithm': 'q_learning'}),
+                             content_type='application/json')
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertIn('algo_info', data)
+        self.assertEqual(data['algo_info']['algorithm'], 'Q-Learning')
+
+    def test_ai_move_algo_mcts(self):
+        r = self.client.post('/api/ai_move_algo',
+                             data=json.dumps({'algorithm': 'mcts'}),
+                             content_type='application/json')
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertIn('algo_info', data)
+
+    def test_compare_algorithms(self):
+        r = self.client.post('/api/compare_algorithms')
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertIn('results', data)
+        self.assertIn('consensus_action', data)
+        self.assertEqual(len(data['results']), 5)
+
+
 def run_all():
     print("=" * 60)
     print("AUTOMATED TEST SUITE")
@@ -368,6 +568,8 @@ def run_all():
     suite.addTests(loader.loadTestsFromTestCase(TestMathModels))
     suite.addTests(loader.loadTestsFromTestCase(TestMCTS))
     suite.addTests(loader.loadTestsFromTestCase(TestIntegration))
+    suite.addTests(loader.loadTestsFromTestCase(TestOptimization))
+    suite.addTests(loader.loadTestsFromTestCase(TestFlaskEndpoints))
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
     print(f"\n{'='*60}")

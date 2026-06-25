@@ -25,6 +25,7 @@ This module implements:
 
 import numpy as np
 from collections import Counter
+from mcts import GameSimulator
 
 
 # ===============================================================
@@ -329,8 +330,6 @@ class ProbabilityModels:
         Returns:
             expected_score_gain (float)
         """
-        from mcts import GameSimulator
-
         total_gain = 0.0
         valid_sims = 0
 
